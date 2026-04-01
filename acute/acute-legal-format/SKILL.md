@@ -1,7 +1,6 @@
----
-name: acute-legal-format
-description: "Format legal transaction documents for the Acute Logistics acquisition to match the ABP Capital legal agreement template. Use this skill whenever Ryan asks to draft, format, or revise a formal Acute transaction document — Asset Purchase Agreement, Bill of Sale, Assignment and Assumption Agreement, Non-Competition Agreement, Transition Services Agreement, Clawback Note, Escrow Agreement, Employment Agreement, or any other legal agreement for the Acute deal. Also trigger when Ryan says 'format this like the template', 'use the legal format', 'match the template formatting', or references formatting consistency with previously drafted Acute documents. Even if Ryan just says 'draft a [document name] for Acute' without mentioning formatting, use this skill — all formal Acute legal documents should use this formatting unless Ryan explicitly says formatting is not important."
----
+------
+
+## name: acute-legal-format description: "Format legal transaction documents for the Acute Logistics acquisition to match the ABP Capital legal agreement template. Use this skill whenever Ryan asks to draft, format, or revise a formal Acute transaction document — Asset Purchase Agreement, Bill of Sale, Assignment and Assumption Agreement, Non-Competition Agreement, Transition Services Agreement, Clawback Note, Escrow Agreement, Employment Agreement, or any other legal agreement for the Acute deal. Also trigger when Ryan says 'format this like the template', 'use the legal format', 'match the template formatting', or references formatting consistency with previously drafted Acute documents. Even if Ryan just says 'draft a [document name] for Acute' without mentioning formatting, use this skill — all formal Acute legal documents should use this formatting unless Ryan explicitly says formatting is not important."
 
 # Acute Legal Agreement Formatting
 
@@ -17,7 +16,7 @@ Word's .docx format is a ZIP of XML files. If you generate a document with a lib
 
 Ryan has iterated extensively on this workflow. The formatting rules below are the result of that iteration. Follow them precisely.
 
----
+------
 
 ## Workflow Overview
 
@@ -45,10 +44,23 @@ Write a Python script that builds the XML body content using the template's styl
 
 Replace the `<w:body>` content in `doc_work/word/document.xml` with your generated paragraphs, preserving the final `<w:sectPr>` element from the template.
 
+**CRITICAL — sectPr extraction:** The template contains multiple `<w:sectPr>` elements. Some are embedded inside `<w:pPr>` blocks (mid-document section breaks) and are NOT the final page-layout sectPr. A naive regex like `re.search(r'<w:sectPr...', body_content)` will grab the wrong one and produce malformed XML. To extract the correct final sectPr:
+
+```python
+# Find the last </w:p> in the body content, then look for <w:sectPr> AFTER it.
+# Only the standalone sectPr (direct child of w:body, not nested in w:pPr) is the final one.
+last_p_end = body_content.rfind('</w:p>')
+if last_p_end != -1:
+    after_last_p = body_content[last_p_end + len('</w:p>'):]
+    sect_match = re.search(r'(<w:sectPr[^>]*>.*?</w:sectPr>)', after_last_p, re.DOTALL)
+    if sect_match:
+        final_sect_pr = sect_match.group(1)
+```
+
 ### Step 4: Run the spacing fixer
 
 ```bash
-python mnt/acute/skills/acute-legal-format/scripts/fix_spacing.py \
+python mnt/.claude/skills/acute-legal-format/scripts/fix_spacing.py \
   <working_dir>/doc_work \
   <output_path>.docx \
   --template "mnt/acute/reference/TEMPLATE - Legal Agreement.docx"
@@ -62,7 +74,7 @@ This script inserts the empty spacer paragraphs and line-spacing attributes that
 python mnt/.claude/skills/docx/scripts/office/validate.py <output_path>.docx
 ```
 
----
+------
 
 ## Style Reference
 
@@ -70,17 +82,17 @@ The template defines a multi-level numbering chain (abstractNum 8, numId 37) wit
 
 ### Document Structure Styles
 
-| Style ID | Purpose | Numbering | Format |
-|---|---|---|---|
-| `ARTICLE` | Article number line ("ARTICLE 1") | numId 37, ilvl 0 | Centered, bold, Arial 10pt |
-| `ARTICLE` (with numId=0) | Article title ("DEFINITIONS") | Numbering suppressed | Centered, bold, Arial 10pt |
-| `SECTIONHEADING` | Section heading ("1.01 Defined Terms") | numId 37, ilvl 1 | Left-aligned, underlined, bold, Arial 10pt |
-| `SECTIONTEXT` | Body paragraph text | No numbering | Justified, firstLine indent 720 twips, after=240, Arial 10pt |
-| `Section101Heading` | Subsection heading (rarely used) | numId 37, ilvl 1 | Similar to SECTIONHEADING |
-| `Section101Text` | Subsection body text | No numbering | Similar to SECTIONTEXT |
-| `aText` | Lettered list item "(a)" | numId 37, ilvl 2 | Justified, hanging indent, Arial 10pt |
-| `iText` | Roman numeral list item "(i)" | numId 37, ilvl 3 | Justified, hanging indent, Arial 10pt |
-| `BodyText` | Plain body text (used for spacers) | No numbering | Justified, Arial 10pt |
+| Style ID                 | Purpose                                | Numbering            | Format                                                       |
+| ------------------------ | -------------------------------------- | -------------------- | ------------------------------------------------------------ |
+| `ARTICLE`                | Article number line ("ARTICLE 1")      | numId 37, ilvl 0     | Centered, bold, Arial 10pt                                   |
+| `ARTICLE` (with numId=0) | Article title ("DEFINITIONS")          | Numbering suppressed | Centered, bold, Arial 10pt                                   |
+| `SECTIONHEADING`         | Section heading ("1.01 Defined Terms") | numId 37, ilvl 1     | Left-aligned, underlined, bold, Arial 10pt                   |
+| `SECTIONTEXT`            | Body paragraph text                    | No numbering         | Justified, firstLine indent 720 twips, after=240, Arial 10pt |
+| `Section101Heading`      | Subsection heading (rarely used)       | numId 37, ilvl 1     | Similar to SECTIONHEADING                                    |
+| `Section101Text`         | Subsection body text                   | No numbering         | Similar to SECTIONTEXT                                       |
+| `aText`                  | Lettered list item "(a)"               | numId 37, ilvl 2     | Justified, hanging indent, Arial 10pt                        |
+| `iText`                  | Roman numeral list item "(i)"          | numId 37, ilvl 3     | Justified, hanging indent, Arial 10pt                        |
+| `BodyText`               | Plain body text (used for spacers)     | No numbering         | Justified, Arial 10pt                                        |
 
 ### Key Numbering Behavior
 
@@ -113,7 +125,7 @@ Each article heading is actually **two** consecutive paragraphs:
 </w:p>
 ```
 
----
+------
 
 ## XML Patterns
 
@@ -141,16 +153,18 @@ Each article heading is actually **two** consecutive paragraphs:
 ### Smart quotes and special characters
 
 Use XML character references — never raw smart quotes:
-- Left double quote: `&#x201C;`
-- Right double quote: `&#x201D;`
-- Apostrophe/right single quote: `&#x2019;`
-- Em-dash: `&#x2014;`
+
+- Left double quote: `“`
+- Right double quote: `”`
+- Apostrophe/right single quote: `’`
+- Em-dash: `—`
 
 ### Preamble / Lead-in Pattern
 
 Preamble paragraphs that introduce parties or recitals should list items **inline** within a single `SECTIONTEXT` paragraph — never as a lettered `(a)/(b)/(c)` list. Lists create unwanted spacing in lead-in text.
 
 **Correct:**
+
 ```xml
 <w:p>
   <w:pPr><w:pStyle w:val="SECTIONTEXT"/></w:pPr>
@@ -166,9 +180,9 @@ Preamble paragraphs that introduce parties or recitals should list items **inlin
 
 ### Signature Block Pattern
 
-Signature blocks use `SECTIONTEXT` style. Use tab characters (`<w:tab/>`) for alignment. Signature lines use underscores.
+Signature blocks use `BodyText` style (not `SECTIONTEXT` — `SECTIONTEXT` adds a first-line indent that misaligns signature lines). Use underscore characters for the signature line. Each label (By:, Name:, Title:) should be its own `BodyText` paragraph.
 
----
+------
 
 ## Spacing Rules (Handled by fix_spacing.py)
 
@@ -181,30 +195,31 @@ The `fix_spacing.py` script handles these automatically — you do NOT need to i
 
 These rules reproduce the visual spacing from the template. Without them, sections run together and list items crowd each other.
 
----
+------
 
 ## Exhibits and Schedules Index
 
-Only include an Exhibits and Schedules page if the body of the agreement actually references exhibits or disclosure schedules. If it does, place the index page after the signature block. Format it as a centered bold heading ("EXHIBITS AND SCHEDULES") followed by a list of each referenced exhibit/schedule with its title, using em-dashes (`&#x2014;`) as separators. If the agreement has no exhibits or schedules, omit this page entirely.
+Only include an Exhibits and Schedules page if the body of the agreement actually references exhibits or disclosure schedules. If it does, place the index page after the signature block. Format it as a centered bold heading ("EXHIBITS AND SCHEDULES") followed by a list of each referenced exhibit/schedule with its title, using em-dashes (`—`) as separators. If the agreement has no exhibits or schedules, omit this page entirely.
 
----
+------
 
 ## File Naming Convention
 
 Ryan's preference: `Acute - [Document Name] - MMDDYYYY [version].docx`
 
 Examples:
+
 - `Acute - Asset Purchase Agreement - 03312026 v3.docx`
 - `Acute - Bill of Sale - 04012026.docx`
 
----
+------
 
 ## Common Pitfalls
 
 1. **Don't use docx-js or python-docx to create from scratch** — these libraries generate their own styles that won't match the template. Always clone the template.
-2. **Don't use raw smart quotes in XML** — they'll cause encoding issues. Use `&#x201C;` etc.
+2. **Don't use raw smart quotes in XML** — they'll cause encoding issues. Use `“` etc.
 3. **Don't manually insert spacer paragraphs** — let fix_spacing.py handle all spacing.
-4. **Don't use `&amp;#x2014;`** — that's double-escaped. Use `&#x2014;` directly.
+4. **Don't use `—`** — that's double-escaped. Use `—` directly.
 5. **Don't forget the ARTICLE two-paragraph pattern** — the numbered paragraph and the title paragraph are separate.
 6. **Don't use list formatting in preambles** — parties and recitals go inline in a single SECTIONTEXT paragraph.
-7. **Preserve the template's sectPr** — the final `<w:sectPr>` in the body defines page size, margins, headers/footers. Always keep it.
+7. **Preserve the correct sectPr** — the final standalone `<w:sectPr>` (direct child of `<w:body>`, after the last `</w:p>`) defines page size, margins, headers/footers. The template also has `<w:sectPr>` elements nested inside `<w:pPr>` blocks (mid-document section breaks) — do NOT use those. See the extraction pattern in Step 3.
