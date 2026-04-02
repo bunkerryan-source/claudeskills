@@ -1,11 +1,11 @@
 ---
 name: general-legal-format
-description: "Format legal transaction documents to match the ABP Capital legal agreement template. Only trigger on explicit invocation of /general-legal-format \u2014 do not auto-trigger on general phrases like 'format this like the template' or 'draft a document'."
+description: "Format legal transaction documents to match the ABP Capital legal agreement template. Only trigger on explicit invocation of /general-legal-format — do not auto-trigger on general phrases like 'format this like the template' or 'draft a document'."
 ---
 
 # General Legal Agreement Formatting
 
-This skill ensures any formal legal document matches the ABP Capital legal agreement template exactly. It is project-agnostic \u2014 use it for any deal, transaction, or project that needs ABP-style legal formatting.
+This skill ensures any formal legal document matches the ABP Capital legal agreement template exactly. It is project-agnostic — use it for any deal, transaction, or project that needs ABP-style legal formatting.
 
 The template lives at:
 
@@ -21,14 +21,14 @@ Because this skill is **explicit-only**, it will only activate when Ryan invokes
 
 When invoked, **ask Ryan two questions before starting**:
 
-1. **What file name should the output use?** (Do not assume a naming convention \u2014 ask every time.)
+1. **What file name should the output use?** (Do not assume a naming convention — ask every time.)
 2. **Where should the output be saved?** (Default to the current project's output folder if one exists, otherwise `mnt/claude-workspace/output/`.)
 
 ---
 
 ## Why This Matters
 
-Word's .docx format is a ZIP of XML files. If you generate a document with a library like docx-js, it creates its own styles from scratch \u2014 and those styles won't match the template. The only reliable way to get pixel-perfect formatting is to **clone the template** (preserving all its styles, numbering definitions, and fonts) and **replace only the body content** with new XML that references the template's existing styles.
+Word's .docx format is a ZIP of XML files. If you generate a document with a library like docx-js, it creates its own styles from scratch — and those styles won't match the template. The only reliable way to get pixel-perfect formatting is to **clone the template** (preserving all its styles, numbering definitions, and fonts) and **replace only the body content** with new XML that references the template's existing styles.
 
 Ryan has iterated extensively on this workflow. The formatting rules below are the result of that iteration. Follow them precisely.
 
@@ -44,7 +44,7 @@ python mnt/.claude/skills/docx/scripts/office/unpack.py \
   <working_dir>/template_unpacked
 ```
 
-This gives you the template's full XML structure \u2014 styles.xml, numbering.xml, document.xml, etc.
+This gives you the template's full XML structure — styles.xml, numbering.xml, document.xml, etc.
 
 ### Step 2: Create your working copy
 
@@ -60,7 +60,7 @@ Write a Python script that builds the XML body content using the template's styl
 
 Replace the `<w:body>` content in `doc_work/word/document.xml` with your generated paragraphs, preserving the final `<w:sectPr>` element from the template.
 
-**CRITICAL \u2014 sectPr extraction:** The template contains multiple `<w:sectPr>` elements. Some are embedded inside `<w:pPr>` blocks (mid-document section breaks) and are NOT the final page-layout sectPr. A naive regex like `re.search(r'<w:sectPr...', body_content)` will grab the wrong one and produce malformed XML. To extract the correct final sectPr:
+**CRITICAL — sectPr extraction:** The template contains multiple `<w:sectPr>` elements. Some are embedded inside `<w:pPr>` blocks (mid-document section breaks) and are NOT the final page-layout sectPr. A naive regex like `re.search(r'<w:sectPr...', body_content)` will grab the wrong one and produce malformed XML. To extract the correct final sectPr:
 
 ```python
 # Find the last </w:p> in the body content, then look for <w:sectPr> AFTER it.
@@ -94,7 +94,7 @@ python mnt/.claude/skills/docx/scripts/office/validate.py <output_path>.docx
 
 ## Style Reference
 
-The template defines a multi-level numbering chain (abstractNum 8, numId 37) with four levels. Every paragraph must use one of the styles below \u2014 never invent new styles.
+The template defines a multi-level numbering chain (abstractNum 8, numId 37) with four levels. Every paragraph must use one of the styles below — never invent new styles.
 
 ### Document Structure Styles
 
@@ -122,8 +122,8 @@ The template defines a multi-level numbering chain (abstractNum 8, numId 37) wit
 
 Each article heading is actually **two** consecutive paragraphs:
 
-1. **Numbered paragraph** \u2014 uses `ARTICLE` style with auto-numbering (generates "ARTICLE 1")
-2. **Title paragraph** \u2014 uses `ARTICLE` style with numbering suppressed (`numId=0`), contains the title text ("DEFINITIONS")
+1. **Numbered paragraph** — uses `ARTICLE` style with auto-numbering (generates "ARTICLE 1")
+2. **Title paragraph** — uses `ARTICLE` style with numbering suppressed (`numId=0`), contains the title text ("DEFINITIONS")
 
 ```xml
 <!-- Paragraph 1: auto-numbered -->
@@ -168,7 +168,7 @@ Each article heading is actually **two** consecutive paragraphs:
 
 ### Smart quotes and special characters
 
-Use XML character references \u2014 never raw smart quotes:
+Use XML character references — never raw smart quotes:
 - Left double quote: `&#x201C;`
 - Right double quote: `&#x201D;`
 - Apostrophe/right single quote: `&#x2019;`
@@ -176,7 +176,7 @@ Use XML character references \u2014 never raw smart quotes:
 
 ### Preamble / Lead-in Pattern
 
-Preamble paragraphs that introduce parties or recitals should list items **inline** within a single `SECTIONTEXT` paragraph \u2014 never as a lettered `(a)/(b)/(c)` list. Lists create unwanted spacing in lead-in text.
+Preamble paragraphs that introduce parties or recitals should list items **inline** within a single `SECTIONTEXT` paragraph — never as a lettered `(a)/(b)/(c)` list. Lists create unwanted spacing in lead-in text.
 
 **Correct:**
 ```xml
@@ -194,18 +194,18 @@ Preamble paragraphs that introduce parties or recitals should list items **inlin
 
 ### Signature Block Pattern
 
-Signature blocks use `BodyText` style (not `SECTIONTEXT` \u2014 `SECTIONTEXT` adds a first-line indent that misaligns signature lines). Use underscore characters for the signature line. Each label (By:, Name:, Title:) should be its own `BodyText` paragraph.
+Signature blocks use `BodyText` style (not `SECTIONTEXT` — `SECTIONTEXT` adds a first-line indent that misaligns signature lines). Use underscore characters for the signature line. Each label (By:, Name:, Title:) should be its own `BodyText` paragraph.
 
 ---
 
 ## Spacing Rules (Handled by fix_spacing.py)
 
-The `fix_spacing.py` script handles these automatically \u2014 you do NOT need to insert spacer paragraphs manually in your generated XML. Just generate the content paragraphs and let the script handle spacing:
+The `fix_spacing.py` script handles these automatically — you do NOT need to insert spacer paragraphs manually in your generated XML. Just generate the content paragraphs and let the script handle spacing:
 
-1. **Before each ARTICLE heading** \u2014 inserts an empty `BodyText` spacer paragraph
-2. **After each ARTICLE title** \u2014 inserts an empty `Section101Heading` paragraph (numbering suppressed)
-3. **After each SECTIONHEADING** \u2014 inserts an empty `Section101Heading` paragraph (numbering suppressed, left indent 720)
-4. **On every `aText` and `iText` paragraph** \u2014 adds `w:spacing w:after="240" w:line="242" w:lineRule="auto"` to the paragraph properties
+1. **Before each ARTICLE heading** — inserts an empty `BodyText` spacer paragraph
+2. **After each ARTICLE title** — inserts an empty `Section101Heading` paragraph (numbering suppressed)
+3. **After each SECTIONHEADING** — inserts an empty `Section101Heading` paragraph (numbering suppressed, left indent 720)
+4. **On every `aText` and `iText` paragraph** — adds `w:spacing w:after="240" w:line="242" w:lineRule="auto"` to the paragraph properties
 
 These rules reproduce the visual spacing from the template. Without them, sections run together and list items crowd each other.
 
@@ -225,9 +225,9 @@ Only include an Exhibits and Schedules page if the body of the agreement actuall
 
 ## Common Pitfalls
 
-1. **Don't use docx-js or python-docx to create from scratch** \u2014 they generate their own styles that won't match the template. Always clone the template and replace body content only.
-2. **Don't invent new styles** \u2014 only use the styles listed in the Style Reference above.
-3. **Don't manually insert spacer paragraphs** \u2014 let fix_spacing.py handle all spacing.
-4. **Don't use raw smart quotes** \u2014 always use XML character references.
-5. **Don't use a naive regex to extract sectPr** \u2014 follow the extraction pattern in Step 3.
-6. **Don't use aText for preamble/lead-in items** \u2014 use inline text within a single SECTIONTEXT paragraph.
+1. **Don't use docx-js or python-docx to create from scratch** — they generate their own styles that won't match the template. Always clone the template and replace body content only.
+2. **Don't invent new styles** — only use the styles listed in the Style Reference above.
+3. **Don't manually insert spacer paragraphs** — let fix_spacing.py handle all spacing.
+4. **Don't use raw smart quotes** — always use XML character references.
+5. **Don't use a naive regex to extract sectPr** — follow the extraction pattern in Step 3.
+6. **Don't use aText for preamble/lead-in items** — use inline text within a single SECTIONTEXT paragraph.
