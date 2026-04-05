@@ -10,10 +10,10 @@ This skill ensures any formal legal document matches the ABP Capital legal agree
 The template lives at:
 
 ```
-mnt/acute/reference/TEMPLATE - Legal Agreement.docx
+mnt/claude-workspace/reference/TEMPLATE - Legal Agreement.docx
 ```
 
-> **Note:** This is the same ABP Capital house-style template used across all projects. If the template is ever moved to a shared location, update this path.
+> **Note:** This is the same ABP Capital house-style template used across all projects. It now lives in the shared reference folder rather than a project-specific location.
 
 ## When This Skill Is Invoked
 
@@ -40,7 +40,7 @@ Ryan has iterated extensively on this workflow. The formatting rules below are t
 
 ```bash
 python mnt/.claude/skills/docx/scripts/office/unpack.py \
-  "mnt/acute/reference/TEMPLATE - Legal Agreement.docx" \
+  "mnt/claude-workspace/reference/TEMPLATE - Legal Agreement.docx" \
   <working_dir>/template_unpacked
 ```
 
@@ -79,7 +79,7 @@ if last_p_end != -1:
 python mnt/.claude/skills/general-legal-format/scripts/fix_spacing.py \
   <working_dir>/doc_work \
   <output_path>.docx \
-  --template "mnt/acute/reference/TEMPLATE - Legal Agreement.docx"
+  --template "mnt/claude-workspace/reference/TEMPLATE - Legal Agreement.docx"
 ```
 
 This script inserts the empty spacer paragraphs and line-spacing attributes that match the template's visual rhythm. See `scripts/fix_spacing.py` for details.
@@ -159,6 +159,38 @@ Each article heading is actually **two** consecutive paragraphs:
 ```xml
 <w:r><w:rPr><w:b/><w:bCs/></w:rPr><w:t>Defined Term</w:t></w:r>
 ```
+
+### Inline Defined Terms (mid-sentence definitions)
+
+When a term is defined inline — i.e., in the middle of a sentence using quotes — the defined term (the text between the quotes) must be **bold**. The surrounding quotes and other sentence text remain in normal weight.
+
+**Example:** `...collectively, the "Purchased Assets"...` becomes:
+
+```xml
+<w:r><w:rPr/><w:t xml:space="preserve">collectively, the &#x201C;</w:t></w:r>
+<w:r><w:rPr><w:b/><w:bCs/></w:rPr><w:t>Purchased Assets</w:t></w:r>
+<w:r><w:rPr/><w:t xml:space="preserve">&#x201D;) shall mean...</w:t></w:r>
+```
+
+**Rule:** Any time text appears between `"..."` (or `&#x201C;...&#x201D;`) as a defined term — whether in SECTIONTEXT, aText, iText, or any other style — split the runs so the quoted term itself is wrapped in `<w:b/><w:bCs/>`. This applies to every inline definition throughout the document, not just the Definitions article.
+
+### List Item Headers (leading phrases in aText / iText)
+
+Some lettered `(a)/(b)` or roman `(i)/(ii)` list items begin with a short header phrase followed by a period, then the substantive text. For example: `(a) Buyout Notice. For avoidance of doubt, this provision...`. The short leading phrase ("Buyout Notice") functions as a sub-header and must be **italicized**. The period after the phrase and all subsequent text remain in normal (non-italic) font.
+
+**How to detect:** If an `aText` or `iText` paragraph begins with a short phrase (typically 1–5 words, not a complete sentence) followed by a period and then the actual body text, treat that short phrase as a header.
+
+**Example:** `(a) Buyout Notice. For avoidance of doubt, this provision doesn't apply...` becomes:
+
+```xml
+<w:p>
+  <w:pPr><w:pStyle w:val="aText"/></w:pPr>
+  <w:r><w:rPr><w:i/><w:iCs/></w:rPr><w:t>Buyout Notice</w:t></w:r>
+  <w:r><w:rPr/><w:t xml:space="preserve">. For avoidance of doubt, this provision doesn&#x2019;t apply...</w:t></w:r>
+</w:p>
+```
+
+**Rule:** When generating `aText` or `iText` paragraphs, check whether the content starts with a short header phrase followed by a period. If so, split the runs: wrap the header phrase in `<w:i/><w:iCs/>` (italic), then start a new normal-weight run beginning with the period. This applies to both `aText` and `iText` levels.
 
 ### Underlined inline text
 

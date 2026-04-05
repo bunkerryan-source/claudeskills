@@ -8,10 +8,8 @@ description: "Format legal transaction documents for the Acute Logistics acquisi
 This skill ensures every formal legal document drafted for the Acute Logistics acquisition matches the ABP Capital legal agreement template exactly. The template lives at:
 
 ```
-C:\Users\rbunker\claude-workspace\reference\TEMPLATE - Legal Agreement.docx
+mnt/claude-workspace/reference/TEMPLATE - Legal Agreement.docx
 ```
-
-**Note:** When running in a Cowork session, locate the template relative to the workspace mount. The file may appear at a path like `mnt/reference/TEMPLATE - Legal Agreement.docx` or similar depending on which folder is mounted. If the exact path is not accessible, ask Ryan to confirm the mount path.
 
 ## Why This Matters
 
@@ -27,7 +25,7 @@ Ryan has iterated extensively on this workflow. The formatting rules below are t
 
 ```bash
 python mnt/.claude/skills/docx/scripts/office/unpack.py \
-  "<path_to_template>/TEMPLATE - Legal Agreement.docx" \
+  "mnt/claude-workspace/reference/TEMPLATE - Legal Agreement.docx" \
   <working_dir>/template_unpacked
 ```
 
@@ -66,7 +64,7 @@ if last_p_end != -1:
 python mnt/.claude/skills/acute-legal-format/scripts/fix_spacing.py \
   <working_dir>/doc_work \
   <output_path>.docx \
-  --template "<path_to_template>/TEMPLATE - Legal Agreement.docx"
+  --template "mnt/claude-workspace/reference/TEMPLATE - Legal Agreement.docx"
 ```
 
 This script inserts the empty spacer paragraphs and line-spacing attributes that match the template's visual rhythm. See `scripts/fix_spacing.py` for details.
@@ -147,16 +145,42 @@ Each article heading is actually **two** consecutive paragraphs:
 <w:r><w:rPr><w:b/><w:bCs/></w:rPr><w:t>Defined Term</w:t></w:r>
 ```
 
+### Inline Defined Terms (mid-sentence definitions)
+
+When a term is defined inline — i.e., in the middle of a sentence using quotes — the defined term (the text between the quotes) must be **bold**. The surrounding quotes and other sentence text remain in normal weight.
+
+**Example:** `...collectively, the "Purchased Assets"...` becomes:
+
+```xml
+<w:r><w:rPr/><w:t xml:space="preserve">collectively, the &#x201C;</w:t></w:r>
+<w:r><w:rPr><w:b/><w:bCs/></w:rPr><w:t>Purchased Assets</w:t></w:r>
+<w:r><w:rPr/><w:t xml:space="preserve">&#x201D;) shall mean...</w:t></w:r>
+```
+
+**Rule:** Any time text appears between `"..."` (or `&#x201C;...&#x201D;`) as a defined term — whether in SECTIONTEXT, aText, iText, or any other style — split the runs so the quoted term itself is wrapped in `<w:b/><w:bCs/>`. This applies to every inline definition throughout the document, not just the Definitions article.
+
+### List Item Headers (leading phrases in aText / iText)
+
+Some lettered `(a)/(b)` or roman `(i)/(ii)` list items begin with a short header phrase followed by a period, then the substantive text. For example: `(a) Buyout Notice. For avoidance of doubt, this provision...`. The short leading phrase ("Buyout Notice") functions as a sub-header and must be **italicized**. The period after the phrase and all subsequent text remain in normal (non-italic) font.
+
+**How to detect:** If an `aText` or `iText` paragraph begins with a short phrase (typically 1–5 words, not a complete sentence) followed by a period and then the actual body text, treat that short phrase as a header.
+
+**Example:** `(a) Buyout Notice. For avoidance of doubt, this provision doesn't apply...` becomes:
+
+```xml
+<w:p>
+  <w:pPr><w:pStyle w:val="aText"/></w:pPr>
+  <w:r><w:rPr><w:i/><w:iCs/></w:rPr><w:t>Buyout Notice</w:t></w:r>
+  <w:r><w:rPr/><w:t xml:space="preserve">. For avoidance of doubt, this provision doesn&#x2019;t apply...</w:t></w:r>
+</w:p>
+```
+
+**Rule:** When generating `aText` or `iText` paragraphs, check whether the content starts with a short header phrase followed by a period. If so, split the runs: wrap the header phrase in `<w:i/><w:iCs/>` (italic), then start a new normal-weight run beginning with the period. This applies to both `aText` and `iText` levels.
+
 ### Underlined inline text
 
 ```xml
 <w:r><w:rPr><w:u w:val="single"/></w:rPr><w:t>underlined text</w:t></w:r>
-```
-
-### Italic inline text (e.g., list item headers)
-
-```xml
-<w:r><w:rPr><w:i/><w:iCs/></w:rPr><w:t>Header Phrase</w:t></w:r>
 ```
 
 ### Smart quotes and special characters
@@ -166,88 +190,6 @@ Use XML character references — never raw smart quotes:
 - Right double quote: `&#x201D;`
 - Apostrophe/right single quote: `&#x2019;`
 - Em-dash: `&#x2014;`
-
----
-
-## Inline Defined Terms — Bold the Quoted Portion
-
-When a defined term appears inline (i.e., in the middle of a sentence rather than as a standalone definition), the portion of the defined term inside the quotation marks must be rendered in **bold**. The surrounding text and quotation marks themselves are normal weight.
-
-**Example sentence:** Each such payment is referred to herein as a "Clawback Payment" and is due upon demand.
-
-**Correct XML:**
-
-```xml
-<w:r><w:rPr/><w:t xml:space="preserve">Each such payment is referred to herein as a &#x201C;</w:t></w:r>
-<w:r><w:rPr><w:b/><w:bCs/></w:rPr><w:t>Clawback Payment</w:t></w:r>
-<w:r><w:rPr/><w:t xml:space="preserve">&#x201D; and is due upon demand.</w:t></w:r>
-```
-
-**Rules:**
-- The left smart quote (`&#x201C;`) stays in the preceding non-bold run.
-- The defined term text itself (between the quotes) gets its own run with `<w:b/><w:bCs/>`.
-- The right smart quote (`&#x201D;`) starts the next non-bold run.
-- This applies everywhere a defined term is introduced or referenced inline with quotes — in SECTIONTEXT, aText, iText, or any other paragraph style.
-- If a sentence introduces multiple defined terms, bold each one separately.
-
-**Incorrect (do NOT do this):**
-```xml
-<!-- Wrong: entire phrase including quotes is bold -->
-<w:r><w:rPr><w:b/><w:bCs/></w:rPr><w:t>&#x201C;Clawback Payment&#x201D;</w:t></w:r>
-
-<!-- Wrong: nothing is bold -->
-<w:r><w:rPr/><w:t>&#x201C;Clawback Payment&#x201D;</w:t></w:r>
-```
-
----
-
-## List Item Headers — Italicize Short Leading Phrases
-
-In `aText` and `iText` list items, a short descriptive phrase sometimes precedes the substantive text of the provision, separated by a period. This phrase functions as a header or label for the list item and must be rendered in **italic**.
-
-**How to identify a list item header:** The list item begins with a short phrase (typically 1–5 words, not a complete sentence) followed by a period, after which the actual provision text begins. The short phrase names or labels the subject of the provision.
-
-**Example:** `(a) Buyout Notice.  For avoidance of doubt, this provision doesn't apply...`
-
-In this example, "Buyout Notice." is the header phrase and should be italicized. "For avoidance of doubt..." is the substantive text and stays in normal (roman) font.
-
-**Correct XML:**
-
-```xml
-<w:p>
-  <w:pPr><w:pStyle w:val="aText"/></w:pPr>
-  <w:r><w:rPr><w:i/><w:iCs/></w:rPr><w:t>Buyout Notice.</w:t></w:r>
-  <w:r><w:rPr/><w:t xml:space="preserve">  For avoidance of doubt, this provision doesn&#x2019;t apply...</w:t></w:r>
-</w:p>
-```
-
-**Rules:**
-- The header phrase includes the trailing period and gets its own run with `<w:i/><w:iCs/>`.
-- Two spaces (or appropriate spacing) follow the period before the substantive text begins in a normal-weight run.
-- This applies to both `aText` (lettered) and `iText` (roman numeral) list items.
-- Not every list item has a header — only italicize when a short labeling phrase clearly precedes the substantive text. If the list item begins directly with a full sentence, no italicization is needed.
-- If the header phrase also contains a defined term in quotes, apply both formatting: the header phrase is italic, and the quoted defined term within it is bold-italic (`<w:b/><w:bCs/><w:i/><w:iCs/>`).
-
-**Another example with (i):**
-
-```xml
-<w:p>
-  <w:pPr><w:pStyle w:val="iText"/></w:pPr>
-  <w:r><w:rPr><w:i/><w:iCs/></w:rPr><w:t>Revenue Threshold.</w:t></w:r>
-  <w:r><w:rPr/><w:t xml:space="preserve">  The Seller shall deliver to Buyer a certificate...</w:t></w:r>
-</w:p>
-```
-
-**Incorrect (do NOT do this):**
-```xml
-<!-- Wrong: header phrase not italicized -->
-<w:r><w:rPr/><w:t xml:space="preserve">Buyout Notice.  For avoidance of doubt...</w:t></w:r>
-
-<!-- Wrong: entire list item italicized -->
-<w:r><w:rPr><w:i/><w:iCs/></w:rPr><w:t>Buyout Notice.  For avoidance of doubt...</w:t></w:r>
-```
-
----
 
 ### Preamble / Lead-in Pattern
 
@@ -311,5 +253,3 @@ Examples:
 5. **Don't forget the ARTICLE two-paragraph pattern** — the numbered paragraph and the title paragraph are separate.
 6. **Don't use list formatting in preambles** — parties and recitals go inline in a single SECTIONTEXT paragraph.
 7. **Preserve the correct sectPr** — the final standalone `<w:sectPr>` (direct child of `<w:body>`, after the last `</w:p>`) defines page size, margins, headers/footers. The template also has `<w:sectPr>` elements nested inside `<w:pPr>` blocks (mid-document section breaks) — do NOT use those. See the extraction pattern in Step 3.
-8. **Don't forget to bold inline defined terms** — when a defined term appears in quotes mid-sentence, the text between the quotes must be bold. See the Inline Defined Terms section.
-9. **Don't forget to italicize list item headers** — when an `aText` or `iText` item starts with a short labeling phrase followed by a period, that phrase must be italic. See the List Item Headers section.
